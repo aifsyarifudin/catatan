@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catatan Modern</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+    <!-- PWA Manifest & Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#059669">
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+
+    <!-- Header / Navbar -->
+    <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-4 py-3.5 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-2">
+                <i data-lucide="notebook-pen" class="w-6 h-6"></i>
+                <h1 class="text-lg sm:text-xl font-bold tracking-wide">Catatan</h1>
+            </div>
+            <!-- Live Search Bar -->
+            <div class="relative w-full sm:w-72">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-emerald-200">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                </span>
+                <input type="text" id="searchInput" placeholder="Cari catatan..." 
+                    class="w-full pl-9 pr-4 py-2 bg-emerald-700/60 text-white placeholder-emerald-200 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 border border-emerald-500/50 transition">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-5xl mx-auto px-4 py-6 sm:py-8">
+        
+        <!-- Form Tambah / Edit Catatan -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-6 sm:mb-8 transition hover:shadow-md">
+            <h2 id="formTitle" class="text-base sm:text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-600"></i> Tambah Catatan Baru
+            </h2>
+            <form id="noteForm" class="space-y-4">
+                <input type="hidden" id="noteId">
+                <div>
+                    <input type="text" id="noteTitle" placeholder="Judul catatan..." required
+                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-sm font-medium transition">
+                </div>
+                <div>
+                    <textarea id="noteContent" rows="3" placeholder="Tulis isi catatan di sini..." required
+                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white text-sm transition resize-none"></textarea>
+                </div>
+                <div class="flex flex-col-reverse sm:flex-row justify-end gap-2">
+                    <button type="button" id="cancelBtn" onclick="resetForm()" class="hidden w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition text-center">Batal</button>
+                    <button type="submit" id="submitBtn" class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm shadow-emerald-200 transition flex items-center justify-center gap-2">
+                        <i data-lucide="save" class="w-4 h-4"></i> Simpan Catatan
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Daftar Catatan (Card Grid) -->
+        <div class="mb-4 flex justify-between items-center">
+            <h3 class="text-sm sm:text-base font-bold text-gray-700">Daftar Catatan Anda</h3>
+            <span id="noteCount" class="text-xs font-semibold px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full">0 catatan</span>
+        </div>
+        
+        <div id="notesContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Kartu Catatan akan muncul di sini secara dinamis -->
+        </div>
+
+        <!-- Kosong State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="file-text" class="w-8 h-8"></i>
+            </div>
+            <p class="text-gray-500 text-sm font-medium">Belum ada catatan atau tidak ditemukan.</p>
+        </div>
+    </main>
+
+    <!-- JavaScript Logika -->
+    <script>
+        // Inisialisasi ikon Lucide
+        lucide.createIcons();
+
+        let notes = JSON.parse(localStorage.getItem('notes')) || [];
+
+        const noteForm = document.getElementById('noteForm');
+        const noteIdInput = document.getElementById('noteId');
+        const noteTitleInput = document.getElementById('noteTitle');
+        const noteContentInput = document.getElementById('noteContent');
+        const notesContainer = document.getElementById('notesContainer');
+        const searchInput = document.getElementById('searchInput');
+        const emptyState = document.getElementById('emptyState');
+        const noteCount = document.getElementById('noteCount');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const formTitle = document.getElementById('formTitle');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Render Catatan ke Halaman
+        function renderNotes(filterText = '') {
+            notesContainer.innerHTML = '';
+            
+            const filteredNotes = notes.filter(note => 
+                note.title.toLowerCase().includes(filterText.toLowerCase()) || 
+                note.content.toLowerCase().includes(filterText.toLowerCase())
+            );
+
+            noteCount.innerText = `${filteredNotes.length} catatan`;
+
+            if (filteredNotes.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                
+                // Urutkan dari yang terbaru
+                filteredNotes.slice().reverse().forEach(note => {
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition group";
+                    
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-start gap-2 mb-2">
+                                <h4 class="font-bold text-gray-800 text-base line-clamp-1">${escapeHtml(note.title)}</h4>
+                                <span class="text-[10px] text-gray-400 whitespace-nowrap">${note.date}</span>
+                            </div>
+                            <p class="text-gray-600 text-sm whitespace-pre-line line-clamp-4 mb-4">${escapeHtml(note.content)}</p>
+                        </div>
+                        <div class="flex justify-end gap-1 pt-3 border-t border-gray-50 opacity-100 sm:opacity-90 group-hover:opacity-100 transition">
+                            <button onclick="editNote('${note.id}')" class="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Edit">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteNote('${note.id}')" class="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Hapus">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `;
+                    notesContainer.appendChild(card);
+                });
+                lucide.createIcons();
+            }
+        }
+
+        // Simpan / Tambah Catatan
+        noteForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = noteIdInput.value;
+            const title = noteTitleInput.value.trim();
+            const content = noteContentInput.value.trim();
+            const dateOptions = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+            const currentDate = new Date().toLocaleDateString('id-ID', dateOptions);
+
+            if (id) {
+                // Update
+                notes = notes.map(note => note.id == id ? { ...note, title, content, date: currentDate + ' (Diedit)' } : note);
+            } else {
+                // Tambah Baru
+                const newNote = {
+                    id: Date.now().toString(),
+                    title,
+                    content,
+                    date: currentDate
+                };
+                notes.push(newNote);
+            }
+
+            saveAndReset();
+        });
+
+        // Hapus Catatan
+        function deleteNote(id) {
+            if (confirm('Yakin ingin menghapus catatan ini?')) {
+                notes = notes.filter(note => note.id !== id);
+                saveAndReset();
+            }
+        }
+
+        // Edit Catatan
+        function editNote(id) {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                noteIdInput.value = note.id;
+                noteTitleInput.value = note.title;
+                noteContentInput.value = note.content;
+                
+                formTitle.innerHTML = `<i data-lucide="pencil" class="w-5 h-5 text-emerald-600"></i> Edit Catatan`;
+                submitBtn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Perbarui Catatan`;
+                cancelBtn.classList.remove('hidden');
+                
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                lucide.createIcons();
+            }
+        }
+
+        // Reset Form
+        function resetForm() {
+            noteForm.reset();
+            noteIdInput.value = '';
+            formTitle.innerHTML = `<i data-lucide="plus-circle" class="w-5 h-5 text-emerald-600"></i> Tambah Catatan Baru`;
+            submitBtn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Simpan Catatan`;
+            cancelBtn.classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        // Simpan ke LocalStorage
+        function saveAndReset() {
+            localStorage.setItem('notes', JSON.stringify(notes));
+            resetForm();
+            renderNotes(searchInput.value);
+        }
+
+        // Live Search Handler
+        searchInput.addEventListener('input', (e) => {
+            renderNotes(e.target.value);
+        });
+
+        // Keamanan XSS Sederhana
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Load awal
+        renderNotes();
+    </script>
+</body>
+</html>
